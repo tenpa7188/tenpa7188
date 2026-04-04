@@ -1,0 +1,58 @@
+name: Update GitHub Profile README
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-profile-readme
+  cancel-in-progress: false
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Update README sections
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/update_readme.py
+
+      - name: Detect README changes
+        id: changes
+        run: |
+          if git diff --quiet -- README.md; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "README.md has no changes."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "README.md was updated."
+          fi
+
+      - name: Configure git author
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit README update
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git add README.md
+          git commit -m "chore: update profile README"
+
+      - name: Push README update
+        if: steps.changes.outputs.changed == 'true'
+        run: git push
